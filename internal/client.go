@@ -8,12 +8,13 @@ import (
 
 // HTTPClient wraps an http.Client with additional functionality
 type HTTPClient struct {
-	client    *http.Client
-	userAgent string
+	client          *http.Client
+	userAgent       string
+	requestCallback func() // Function to call when a request is made
 }
 
-// NewHTTPClient creates a new HTTP client
-func NewHTTPClient() *HTTPClient {
+// NewHTTPClient creates a new HTTP client with optional request callback
+func NewHTTPClient(callback func()) *HTTPClient {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		// We don't follow redirects automatically as we want to simulate
@@ -24,8 +25,9 @@ func NewHTTPClient() *HTTPClient {
 	}
 
 	return &HTTPClient{
-		client:    client,
-		userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		client:          client,
+		userAgent:       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+		requestCallback: callback,
 	}
 }
 
@@ -57,6 +59,11 @@ func (c *HTTPClient) Get(url string) error {
 
 	// Log the response status
 	fmt.Printf("Response status: %s\n", resp.Status)
+
+	// Call the request callback if provided
+	if c.requestCallback != nil {
+		c.requestCallback()
+	}
 
 	return nil
 }

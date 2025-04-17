@@ -1,3 +1,3 @@
-module github.com/user/fake-traffic-go
+module fake-traffic-go
 
 go 1.21.6

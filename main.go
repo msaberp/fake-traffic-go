@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/user/fake-traffic-go/config"
-	"github.com/user/fake-traffic-go/internal"
-	"github.com/user/fake-traffic-go/urls"
+	"fake-traffic-go/config"
+	"fake-traffic-go/internal"
+	"fake-traffic-go/urls"
 )
 
 func main() {
@@ -68,7 +68,7 @@ func main() {
 	}
 
 	// Create and start traffic generator
-	generator, err := internal.NewTrafficGenerator(&cfg)
+	generator, err := internal.NewTrafficGenerator(cfg)
 	if err != nil {
 		fmt.Printf("Error initializing traffic generator: %v\n", err)
 		os.Exit(1)

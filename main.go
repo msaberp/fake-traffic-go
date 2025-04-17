@@ -21,6 +21,12 @@ func main() {
 	rps := flag.Int("rps", 50, "Target requests per second")
 	urlFile := flag.String("urls", "urls/urls.txt", "Path to URL list file")
 	createSample := flag.Bool("create-sample", false, "Create a sample URL file if none exists")
+	filterURLs := flag.Bool("filter-urls", false, "Filter URLs to remove unreachable ones")
+	filterTimeout := flag.Int("filter-timeout", 5, "Timeout in seconds when checking URL reachability")
+	filterWorkers := flag.Int("filter-workers", 20, "Number of concurrent workers for URL filtering")
+	filterOutput := flag.String("filter-output", "", "Output file for filtered URLs (defaults to overwriting input file)")
+	skipReachability := flag.Bool("skip-reachability", false, "Skip checking if URLs are reachable (faster but less accurate)")
+	filterOnly := flag.Bool("filter-only", false, "Only filter URLs without starting traffic generation")
 	ipStart := flag.String("ip-start", "192.168.1.1", "Start of IP range")
 	ipEnd := flag.String("ip-end", "192.168.1.254", "End of IP range")
 
@@ -64,6 +70,38 @@ func main() {
 			fmt.Printf("Error creating sample URL file: %v\n", err)
 		} else {
 			fmt.Printf("Created sample URL file at: %s\n", cfg.URLFilePath)
+		}
+	}
+
+	// Filter URLs if requested
+	if *filterURLs {
+		outputPath := cfg.URLFilePath
+		if *filterOutput != "" {
+			outputPath = *filterOutput
+		}
+
+		options := urls.FilterOptions{
+			Timeout:           *filterTimeout,
+			Workers:           *filterWorkers,
+			CheckReachability: !*skipReachability,
+			ValidateURL:       true,
+			ExcludeDomains:    []string{},
+			AllowProtocols:    []string{"http", "https"},
+		}
+
+		fmt.Printf("Filtering URLs in %s...\n", cfg.URLFilePath)
+		totalURLs, validURLs, err := urls.FilterURLsFile(cfg.URLFilePath, outputPath, options)
+		if err != nil {
+			fmt.Printf("Error filtering URLs: %v\n", err)
+		} else {
+			fmt.Printf("URL filtering completed: %d of %d URLs are valid (%.1f%%)\n",
+				validURLs, totalURLs, float64(validURLs)/float64(totalURLs)*100.0)
+
+			// Exit after filtering if requested
+			if *filterOnly {
+				fmt.Println("Filter-only mode: exiting without starting traffic generation")
+				return
+			}
 		}
 	}
 

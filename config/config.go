@@ -32,7 +32,7 @@ type Config struct {
 }
 
 // Default configuration values
-var DefaultConfig = Config{
+var DefaultConfig = &Config{
 	ConcurrentUsers:    10,
 	RequestsPerSecond:  50,
 	URLFilePath:        "urls/urls.txt",

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/fake-traffic-go/ipspoof"
-	"github.com/user/fake-traffic-go/urls"
+	"fake-traffic-go/ipspoof"
+	"fake-traffic-go/urls"
 )
 
 // BrowserUser represents a simulated user browsing the web
@@ -25,7 +25,7 @@ type BrowserUser struct {
 }
 
 // NewBrowserUser creates a new simulated browser user
-func NewBrowserUser(id int, urlManager *urls.URLManager, ipspoofer *ipspoof.IPSpoofer, wg *sync.WaitGroup) *BrowserUser {
+func NewBrowserUser(id int, urlManager *urls.URLManager, ipspoofer *ipspoof.IPSpoofer, wg *sync.WaitGroup, generator *TrafficGenerator) *BrowserUser {
 	source := rand.NewSource(time.Now().UnixNano() + int64(id))
 	r := rand.New(source)
 
@@ -35,6 +35,12 @@ func NewBrowserUser(id int, urlManager *urls.URLManager, ipspoofer *ipspoof.IPSp
 	// Generate random session time between 10-30 minutes
 	sessionTime := 10.0 + r.Float64()*20.0
 
+	// Create a callback function that records requests in the generator
+	var requestCallback func()
+	if generator != nil {
+		requestCallback = generator.RecordRequest
+	}
+
 	return &BrowserUser{
 		ID:          id,
 		UserAgent:   ipspoof.GenerateRandomUserAgent(),
@@ -42,7 +48,7 @@ func NewBrowserUser(id int, urlManager *urls.URLManager, ipspoofer *ipspoof.IPSp
 		sessionTime: sessionTime,
 		thinkTime:   thinkTime,
 		urlManager:  urlManager,
-		client:      NewHTTPClient(),
+		client:      NewHTTPClient(requestCallback),
 		stopChan:    make(chan struct{}),
 		wg:          wg,
 		rand:        r,

@@ -18,7 +18,7 @@ type IPSpoofer struct {
 }
 
 // NewIPSpoofer creates a new IP spoofer within the given range
-func NewIPSpoofer(startIPStr, endIPStr string) (*IPSpoofer, error) {
+func NewIPSpoofer(startIPStr string, endIPStr string) (*IPSpoofer, error) {
 	startIP := net.ParseIP(startIPStr).To4()
 	if startIP == nil {
 		return nil, fmt.Errorf("invalid start IP address: %s", startIPStr)

@@ -5,21 +5,24 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/fake-traffic-go/config"
-	"github.com/user/fake-traffic-go/ipspoof"
-	"github.com/user/fake-traffic-go/urls"
+	"fake-traffic-go/config"
+	"fake-traffic-go/ipspoof"
+	"fake-traffic-go/urls"
 )
 
 // TrafficGenerator coordinates traffic generation
 type TrafficGenerator struct {
-	config     *config.Config
-	urlManager *urls.URLManager
-	ipSpoofer  *ipspoof.IPSpoofer
-	users      map[int]*BrowserUser
-	usersMutex sync.Mutex
-	wg         sync.WaitGroup
-	running    bool
-	stopChan   chan struct{}
+	config        *config.Config
+	urlManager    *urls.URLManager
+	ipSpoofer     *ipspoof.IPSpoofer
+	users         map[int]*BrowserUser
+	usersMutex    sync.Mutex
+	wg            sync.WaitGroup
+	running       bool
+	stopChan      chan struct{}
+	requestCount  int64
+	requestsMutex sync.Mutex
+	requestsStart time.Time
 }
 
 // NewTrafficGenerator creates a new traffic generator
@@ -38,11 +41,13 @@ func NewTrafficGenerator(cfg *config.Config) (*TrafficGenerator, error) {
 	}
 
 	return &TrafficGenerator{
-		config:     cfg,
-		urlManager: urlManager,
-		ipSpoofer:  ipSpoofer,
-		users:      make(map[int]*BrowserUser),
-		stopChan:   make(chan struct{}),
+		config:        cfg,
+		urlManager:    urlManager,
+		ipSpoofer:     ipSpoofer,
+		users:         make(map[int]*BrowserUser),
+		stopChan:      make(chan struct{}),
+		requestCount:  0,
+		requestsStart: time.Now(),
 	}, nil
 }
 
@@ -119,7 +124,7 @@ func (g *TrafficGenerator) adjustActiveUsers(targetCount int) {
 	// Add users if needed
 	if currentCount < targetCount {
 		for i := currentCount; i < targetCount; i++ {
-			user := NewBrowserUser(i, g.urlManager, g.ipSpoofer, &g.wg)
+			user := NewBrowserUser(i, g.urlManager, g.ipSpoofer, &g.wg, g)
 			g.users[i] = user
 			user.Start()
 		}
@@ -138,17 +143,46 @@ func (g *TrafficGenerator) adjustActiveUsers(targetCount int) {
 	}
 }
 
+// RecordRequest increments the request counter
+func (g *TrafficGenerator) RecordRequest() {
+	g.requestsMutex.Lock()
+	defer g.requestsMutex.Unlock()
+	g.requestCount++
+}
+
+// GetActualRequestsPerSecond calculates the actual requests per second
+func (g *TrafficGenerator) GetActualRequestsPerSecond() float64 {
+	g.requestsMutex.Lock()
+	defer g.requestsMutex.Unlock()
+
+	elapsed := time.Since(g.requestsStart).Seconds()
+	if elapsed < 1 {
+		return 0 // Not enough time has passed for accurate measurement
+	}
+
+	rps := float64(g.requestCount) / elapsed
+
+	// Reset counters every minute to avoid integer overflow and keep measurement recent
+	if elapsed > 60 {
+		g.requestCount = 0
+		g.requestsStart = time.Now()
+	}
+
+	return rps
+}
+
 // GetStats returns statistics about the traffic generation
-func (g *TrafficGenerator) GetStats() map[string]interface{} {
+func (g *TrafficGenerator) GetStats() map[string]any {
 	g.usersMutex.Lock()
 	activeUsers := len(g.users)
 	g.usersMutex.Unlock()
 
-	return map[string]interface{}{
-		"active_users":        activeUsers,
-		"target_users":        g.config.GetConcurrentUsers(),
-		"requests_per_second": g.config.GetRequestsPerSecond(),
-		"url_count":           g.urlManager.Count(),
-		"enabled":             g.config.IsEnabled(),
+	return map[string]any{
+		"active_users":            activeUsers,
+		"target_users":            g.config.GetConcurrentUsers(),
+		"target_requests_per_sec": g.config.GetRequestsPerSecond(),
+		"actual_requests_per_sec": float64(int(g.GetActualRequestsPerSecond()*100)) / 100, // Round to 2 decimal places
+		"url_count":               g.urlManager.Count(),
+		"enabled":                 g.config.IsEnabled(),
 	}
 }
